@@ -75,14 +75,22 @@ m.init();
 
 // console.log(m.findColor({r: 51, g: 51, b: 51}, 0, 0, 270, 120));
 
-// moveMouse(240, 100).then(function() {
-// 	moveMouse(280, 140);
-// })
-
 // console.log(m.getColor(0,0));
+for (var x = 301; x < 303; x++) {
+	console.log(m.processScreen(x, 466, x, 466));
+	console.log(m.getColor(x, 466));
+	m.setMouse(x, 466);
+}
 
-m.processScreen(500, 500, 500, 500);
-// console.log(m.getColor(0, 0));
+// var y = 350;
+// for (var x = 360; x < 500; x++) {
+// 	var cola = m.processScreen(x, y, x, y);
+// 	var colb = m.getColor(x, y);
+// 	if (cola.r !== colb.r || cola.g !== colb.g || cola.b !== colb.b) {
+// 		console.log('No match at '+x+', '+y,cola,colb);
+// 	}
+// 	m.setMouse(x, y);
+// }
 
 // moveMouse(390, 100).then(function() {
 // 	clickMouse(390, 100).then(function () {
@@ -92,11 +100,9 @@ m.processScreen(500, 500, 500, 500);
 
 // setInterval(function () {
 // 	var pos = m.getMousePos();
+// 	console.log(pos);
 // 	var color = m.getColor(pos.x,pos.y);
 // 	console.log(color);
-// 	if (color.red == 1 && color.green == 1 && color.blue == 1) {
-// 		m.setMouse(pos.x + 1, pos.y);
-// 	}
 // },16);
 
 m.quit();

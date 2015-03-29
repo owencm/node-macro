@@ -84,6 +84,7 @@ var getBitmap = function(xs, ys, xe, ye) {
 
 var processScreen = function(xs, ys, xe, ye) {
     var displayID = getDisplayId();
+    console.log(xs, ys, xe, ye);
     var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
     var width = $.CGImageGetWidth(cGImageRef);
     var height = $.CGImageGetHeight(cGImageRef);
@@ -91,12 +92,16 @@ var processScreen = function(xs, ys, xe, ye) {
     var cFDataRef = $.CGDataProviderCopyData($.CGImageGetDataProvider(cGImageRef));
     var data = $.CFDataGetBytePtr(cFDataRef);
     var buffer = new Buffer(data);
-    // console.log(buffer.length);
     console.log(buffer.toJSON());
-    // console.log(buffer.readUInt8(0));
-    // console.log(buffer.readUInt8(1));
-    // console.log(buffer.readUInt8(2));
-    return;
+    // for (var x = 0; x < width; x += 2) {
+    //     for (var y = 0; y < height; y += 2) {
+
+    //     }
+    // }
+    var color = {r: buffer.readUInt8(2), g: buffer.readUInt8(1), b: buffer.readUInt8(0)};
+    // console.log(color);
+    $.CGDataProviderRelease(cFDataRef);
+    return color;
 }
 
 var oldGetColor = function(x, y) {
@@ -123,14 +128,14 @@ var findColor = function(targetColor, xs, ys, xe, ye) {
     var pixelData = new Buffer(17);
     for (var xi = 0; xi <= (xe - xs) * 2; xi += 2) {
         for (var yi = 0; yi <= (ye - ys) * 2; yi += 2) {
-            // if (Math.random() < 0.01) setMouse(xs+xi/2, ys+yi/2);
+            if (Math.random() < 0.01) setMouse(xs+xi/2, ys+yi/2);
             bitmap('getPixel', pixelData, 'atX', xi, 'y', yi); 
-            // var color = {r: pixelData.readUInt8(0), g: pixelData.readUInt8(8), b: pixelData.readUInt8(16)};
-            // if (color.r == targetColor.r && color.g == targetColor.g && color.b == targetColor.b) {
-            //     bitmap('release');
-            //     console.log('done');
-            //     return {x: xs + xi/2, y: ys + yi/2};
-            // }
+            var color = {r: pixelData.readUInt8(0), g: pixelData.readUInt8(8), b: pixelData.readUInt8(16)};
+            if (color.r == targetColor.r && color.g == targetColor.g && color.b == targetColor.b) {
+                bitmap('release');
+                console.log('done');
+                return {x: xs + xi/2, y: ys + yi/2};
+            }
         }
     }
     bitmap('release');
