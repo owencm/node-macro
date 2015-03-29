@@ -109,6 +109,10 @@ var getRealColor = function(x, y) {
 }
 
 var findColor = function(target, xs, ys, xe, ye) {
+    return findColorTolerance(target, xs, ys, xe, ye, 0);
+}
+
+var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
     var startTime = Date.now();
     var displayID = getDisplayId();
     var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
@@ -130,7 +134,7 @@ var findColor = function(target, xs, ys, xe, ye) {
             var b = data[4*(x + y * width) + 2];
             // console.log('red is at '+4*(x + y * width)+', green is at '+4*(x + y * width + 1)+', blue is at '+4*(x + y * width + 2));
             // console.log('color at '+(xs + x/2)+', '+(ys + y/2) + ' is '+r+', '+g+', '+b);
-            if (r == target.r && g == target.g && b == target.b) {
+            if (Math.abs(r - target.r) + Math.abs(g - target.g) + Math.abs(b - target.b) <= tol) {
                 // setMouse(xs + x/2, ys + y/2);
                 return {x: xs + x/2, y: ys + y/2};
             }
@@ -158,5 +162,6 @@ module.exports = {
     getColor: getColor,
     getRealColor: getRealColor,
     findColor: findColor,
+    findColorTolerance: findColorTolerance,
     quit: quit
 }

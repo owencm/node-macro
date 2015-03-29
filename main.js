@@ -73,9 +73,9 @@ var type = function (str) {
 
 m.init();
 
-var target = {r: 0, g: 255, b: 0};
+var target = {r: 255, g: 154, b: 0};
 console.log('Searching for ',target);
-var pos = m.findColor(target, 0, 0, 100, 100);
+var pos = m.findColorTolerance(target, 0, 0, 1000, 1000, 40);
 console.log(pos);
 if (pos.x > -1 && pos.y > -1) {
 	m.setMouse(pos.x, pos.y);
