@@ -1,0 +1,23 @@
+{
+  "name": "macrojs",
+  "version": "0.0.1",
+  "description": "",
+  "author": "Owen Campbell-Moore <owencmoore@gmail.com>",
+  "repository" :
+  { "type" : "git",
+    "url" : "https://github.com/owencm/node-macro.git"
+  },
+  "main": "macro.js",
+  "bugs": {
+    "url": "https://github.com/owencm/node-macro/issues"
+  },
+  "engines": {
+    "node": "*"
+  },
+  "dependencies": {
+    "NodObjC": "~1.0.0",
+    "ffi": "git+https://github.com/kjunichi/node-ffi.git#bad796888ad564bbc6a15b73579223b8f118605e"
+
+  },
+  "license": "MIT"
+}
