@@ -82,68 +82,65 @@ var getBitmap = function(xs, ys, xe, ye) {
     return bitmap;
 }
 
-var processScreen = function(xs, ys, xe, ye) {
+var getColor = function (x, y) {
     var displayID = getDisplayId();
-    console.log(xs, ys, xe, ye);
-    var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
+    var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(x, y, 1, 1));
     var width = $.CGImageGetWidth(cGImageRef);
     var height = $.CGImageGetHeight(cGImageRef);
-    console.log(width+', '+height);
-    var cFDataRef = $.CGDataProviderCopyData($.CGImageGetDataProvider(cGImageRef));
-    var data = $.CFDataGetBytePtr(cFDataRef);
-    var buffer = new Buffer(data);
-    console.log(buffer.toJSON());
-    // for (var x = 0; x < width; x += 2) {
-    //     for (var y = 0; y < height; y += 2) {
-
-    //     }
-    // }
-    var color = {r: buffer.readUInt8(2), g: buffer.readUInt8(1), b: buffer.readUInt8(0)};
-    // console.log(color);
-    $.CGDataProviderRelease(cFDataRef);
-    return color;
+    var data = new Buffer(height * width * 4);
+    var bytesPerPixel = 4;
+    var bytesPerRow = bytesPerPixel * width;
+    var bitsPerComponent = 8;
+    var cGColorSpaceRef = $.CGColorSpaceCreateDeviceRGB();
+    var cGContextRef = $.CGBitmapContextCreate(data, width, height, bitsPerComponent, bytesPerRow, cGColorSpaceRef, $.kCGImageAlphaPremultipliedLast | $.kCGBitmapByteOrder32Big);
+    $.CGContextDrawImage(cGContextRef, $.CGRectMake(0, 0, width, height), cGImageRef);
+    $.CGContextRelease(cGContextRef);
+    return {r: data[0], g: data[1], b: data[2]};    
 }
 
-var oldGetColor = function(x, y) {
-    var bitmap = getBitmap(x, y, x, y);
-    var color = bitmap('colorAtX', 0, 'y', 0);  
-    bitmap('release');
-    var red = color('redComponent');
-    var green = color('greenComponent');
-    var blue = color('blueComponent');
+var getRealColor = function(x, y) {
+    var nSBitmapImageRep = getBitmap(x, y, x, y);
+    var nSColor = nSBitmapImageRep('colorAtX', 0, 'y', 0);  
+    nSBitmapImageRep('release');
+    var red = nSColor('redComponent') * 255;
+    var green = nSColor('greenComponent') * 255;
+    var blue = nSColor('blueComponent') * 255;
     return {r: red, g: green, b: blue};    
 }
 
-var getColor = function(x, y) {
-    var bitmap = getBitmap(x, y, x, y);
-    var pixelData = new Buffer(17);
-    bitmap('getPixel', pixelData, 'atX', 0, 'y', 0); 
-    bitmap('release');
-    return {r: pixelData.readUInt8(0), g: pixelData.readUInt8(8), b: pixelData.readUInt8(16)};
-}
-
-var findColor = function(targetColor, xs, ys, xe, ye) {
-    console.log('start');
-    var bitmap = getBitmap(xs, ys, xe, ye);
-    var pixelData = new Buffer(17);
-    for (var xi = 0; xi <= (xe - xs) * 2; xi += 2) {
-        for (var yi = 0; yi <= (ye - ys) * 2; yi += 2) {
-            if (Math.random() < 0.01) setMouse(xs+xi/2, ys+yi/2);
-            bitmap('getPixel', pixelData, 'atX', xi, 'y', yi); 
-            var color = {r: pixelData.readUInt8(0), g: pixelData.readUInt8(8), b: pixelData.readUInt8(16)};
-            if (color.r == targetColor.r && color.g == targetColor.g && color.b == targetColor.b) {
-                bitmap('release');
-                console.log('done');
-                return {x: xs + xi/2, y: ys + yi/2};
+var findColor = function(target, xs, ys, xe, ye) {
+    var startTime = Date.now();
+    var displayID = getDisplayId();
+    var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
+    var width = $.CGImageGetWidth(cGImageRef);
+    var height = $.CGImageGetHeight(cGImageRef);
+    var data = new Buffer(height * width * 4);
+    var bytesPerPixel = 4;
+    var bytesPerRow = bytesPerPixel * width;
+    var bitsPerComponent = 8;
+    var cGColorSpaceRef = $.CGColorSpaceCreateDeviceRGB();
+    var cGContextRef = $.CGBitmapContextCreate(data, width, height, bitsPerComponent, bytesPerRow, cGColorSpaceRef, $.kCGImageAlphaPremultipliedLast | $.kCGBitmapByteOrder32Big);
+    $.CGContextDrawImage(cGContextRef, $.CGRectMake(0, 0, width, height), cGImageRef);
+    $.CGContextRelease(cGContextRef);
+    // console.log(data.toJSON());
+    for (var y = 0; y <= 2 * (ye - ys); y += 2) {
+        for (var x = 0; x <= 2 * (xe - xs); x += 2) {
+            var r = data[4*(x + y * width)];
+            var g = data[4*(x + y * width) + 1];
+            var b = data[4*(x + y * width) + 2];
+            // console.log('red is at '+4*(x + y * width)+', green is at '+4*(x + y * width + 1)+', blue is at '+4*(x + y * width + 2));
+            // console.log('color at '+(xs + x/2)+', '+(ys + y/2) + ' is '+r+', '+g+', '+b);
+            if (r == target.r && g == target.g && b == target.b) {
+                // setMouse(xs + x/2, ys + y/2);
+                return {x: xs + x/2, y: ys + y/2};
             }
         }
     }
-    bitmap('release');
-    return {x: -1, y: -1};
+    var endTime = Date.now();
+    var timeDelta = endTime-startTime;
+    console.log('Done. Took '+timeDelta+'ms, or '+(timeDelta/((xe-xs)*(ye-ys)))+'ms per pixel.');
+    return {x: -1, y: -1}
 }
-
-// Convenience functions written on top of the above API
-
 
 
 var quit = function() {
@@ -159,7 +156,7 @@ module.exports = {
     keyDown: keyDown,
     keyUp: keyUp,
     getColor: getColor,
+    getRealColor: getRealColor,
     findColor: findColor,
-    processScreen: processScreen,
     quit: quit
 }

@@ -73,14 +73,20 @@ var type = function (str) {
 
 m.init();
 
-// console.log(m.findColor({r: 51, g: 51, b: 51}, 0, 0, 270, 120));
-
-// console.log(m.getColor(0,0));
-for (var x = 301; x < 303; x++) {
-	console.log(m.processScreen(x, 466, x, 466));
-	console.log(m.getColor(x, 466));
-	m.setMouse(x, 466);
+var target = {r: 0, g: 255, b: 0};
+console.log('Searching for ',target);
+var pos = m.findColor(target, 0, 0, 100, 100);
+console.log(pos);
+if (pos.x > -1 && pos.y > -1) {
+	m.setMouse(pos.x, pos.y);
+	console.log('The color there is:' + JSON.stringify(m.getColor(pos.x, pos.y)));
 }
+
+// for (var x = 329; x < 350; x++) {
+// 	console.log(m.processScreen(x, 466, x, 466));
+// 	console.log(m.getColor(x, 466));
+// 	m.setMouse(x, 466);
+// }
 
 // var y = 350;
 // for (var x = 360; x < 500; x++) {
@@ -103,6 +109,6 @@ for (var x = 301; x < 303; x++) {
 // 	console.log(pos);
 // 	var color = m.getColor(pos.x,pos.y);
 // 	console.log(color);
-// },16);
+// },100);
 
 m.quit();
