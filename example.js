@@ -19,6 +19,9 @@ Welcome to macrojs. $ supports the following methods:
 
 	To call any of these you *must* use the yield keyword before the call. To learn why read http://www.html5rocks.com/en/tutorials/es6/promises/
 
+	If you implement a function which uses a call from $ you must include the boilerplate Promise and spawn function as in the moveMouseToColorInBoxWithTolerance example.
+	If you implement a function which doesn't call $ you may do it in the normal way.
+
 */
 
 var $ = require('./macro.js');
