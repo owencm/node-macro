@@ -4,15 +4,16 @@ var $ = require('NodObjC');
 $.framework('Cocoa');
 $.framework('Foundation');
 
-var pool;
+var pool, cGEventSourceRef;
 
 var init = function() {
     pool = $.NSAutoreleasePool('alloc')('init');
+    cGEventSourceRef = $.CGEventSourceCreate($.kCGEventSourceStateHIDSystemState);
 }
 
 var getMousePos = function() {
     return new Promise(function(resolve, reject){
-        var ourEvent = $.CGEventCreate(null); 
+        var ourEvent = $.CGEventCreate(cGEventSourceRef); 
         var pos = $.CGEventGetLocation(ourEvent);
         resolve({x: pos.x << 0, y: pos.y << 0});
     });
@@ -20,7 +21,7 @@ var getMousePos = function() {
 
 var setMouse = function(x, y) {
     return new Promise(function(resolve, reject){
-        var e = $.CGEventCreateMouseEvent(null, $.kCGEventMouseMoved, $.CGPointMake(x, y), $.kCGMouseButtonLeft);
+        var e = $.CGEventCreateMouseEvent(cGEventSourceRef, $.kCGEventMouseMoved, $.CGPointMake(x, y), $.kCGMouseButtonLeft);
         $.CGEventPost($.kCGHIDEventTap, e);
         // $.CFRelease(e);
         resolve();
@@ -34,7 +35,7 @@ var mouseDown = function(x, y, right) {
         }
         var kCGEvent = right ? $.kCGEventRightMouseDown : $.kCGEventLeftMouseDown;
         var kCGMouseButton = right ? $.kCGMouseButtonRight : $.kCGMouseButtonLeft;
-        var e = $.CGEventCreateMouseEvent(null, kCGEvent, $.CGPointMake(x, y), kCGMouseButton);
+        var e = $.CGEventCreateMouseEvent(cGEventSourceRef, kCGEvent, $.CGPointMake(x, y), kCGMouseButton);
         $.CGEventPost($.kCGHIDEventTap, e);
         // $.CFRelease(e);
         resolve();
@@ -48,7 +49,7 @@ var mouseUp = function(x, y, right) {
         }
         var kCGEvent = right ? $.kCGEventRightMouseUp : $.kCGEventLeftMouseUp;
         var kCGMouseButton = right ? $.kCGMouseButtonRight : $.kCGMouseButtonLeft;
-        var e = $.CGEventCreateMouseEvent(null, kCGEvent, $.CGPointMake(x, y), kCGMouseButton);
+        var e = $.CGEventCreateMouseEvent(cGEventSourceRef, kCGEvent, $.CGPointMake(x, y), kCGMouseButton);
         $.CGEventPost($.kCGHIDEventTap, e);
         // $.CFRelease(e);
         resolve();
@@ -67,7 +68,7 @@ var keyDown = function(char) {
         if (keyCode == undefined) {
             throw 'Unrecognised character in keyDown';
         }
-        var e = $.CGEventCreateKeyboardEvent(null, keyCode, true);
+        var e = $.CGEventCreateKeyboardEvent(cGEventSourceRef, keyCode, true);
         $.CGEventPost($.kCGHIDEventTap, e);
         // $.CFRelease(e);
         resolve();
@@ -80,7 +81,7 @@ var keyUp = function(char) {
         if (keyCode == undefined) {
             throw 'Unrecognised character in keyUp';
         }
-        var e = $.CGEventCreateKeyboardEvent(null, keyCode, false);
+        var e = $.CGEventCreateKeyboardEvent(cGEventSourceRef, keyCode, false);
         $.CGEventPost($.kCGHIDEventTap, e);
         // $.CFRelease(e);
         resolve();
