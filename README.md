@@ -1,6 +1,7 @@
-# node-macro
-A macro framework for OSX in Node / IOJS / Javascript. 
+# macro.js
 
-Allows you to control the mouse and keyboard from JS and read/find colors on the screen.
+A macro framework for OSX in Node / io.js / Javascript.
 
-Originally written to support writing bots for Runescape.
+This library was originally written for writing 'bots' for the online game Runescape in Javascript. It provides the ability to control the keyboard and mouse like a human would and find colors on the screen.
+
+See example.js for usage.
