@@ -6,11 +6,6 @@ $.framework('Foundation');
 
 var pool, cGEventSourceRef;
 
-var init = function() {
-    pool = $.NSAutoreleasePool('alloc')('init');
-    cGEventSourceRef = $.CGEventSourceCreate($.kCGEventSourceStateHIDSystemState);
-}
-
 // Borrowed from Q
 function spawn(generatorFunc) {
   function continuer(verb, arg) {
@@ -186,7 +181,7 @@ var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
         }
         var endTime = Date.now();
         var timeDelta = endTime-startTime;
-        console.log('Done. Took '+timeDelta+'ms, or '+(timeDelta/((xe-xs)*(ye-ys)))+'ms per pixel.');
+        // console.log('Done. Took '+timeDelta+'ms, or '+(timeDelta/((xe-xs)*(ye-ys)))+'ms per pixel.');
         resolve({x: -1, y: -1});
     });
 }
@@ -384,9 +379,16 @@ var sendKeysHuman = function (str) {
     });
 }
 
+var init = function() {
+    pool = $.NSAutoreleasePool('alloc')('init');
+    cGEventSourceRef = $.CGEventSourceCreate($.kCGEventSourceStateHIDSystemState);
+}
+
 var quit = function() {
     pool('drain');
 }
+
+init();
 
 module.exports = {
     init: init,

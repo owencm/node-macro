@@ -1,5 +1,3 @@
-var $ = require('./macro.js');
-
 /* 
 
 Welcome to macrojs. $ supports the following methods:
@@ -23,7 +21,8 @@ Welcome to macrojs. $ supports the following methods:
 
 */
 
-$.init();
+var $ = require('./macro.js');
+
 $.spawn(function*(){
 
 	// This moves the mouse to (100, 100), clicks, then types "Hello world".
@@ -32,12 +31,11 @@ $.spawn(function*(){
 	yield $.clickMouse(100, 100);
 	yield $.wait(1000);
 	yield $.sendKeysHuman('Hello world');
+	yield $.wait(1000 + $.random(0, 1000));
 
-	// This finds the color in the box and moves the mouse to it immediately
-	var pos = yield $.findColorTolerance({r: 50, g: 50, b: 50}, 0, 0, 1000, 1000, 0);
-	if (pos.x > -1 && pos.y > -1) {
-		yield $.setMouse(pos.x, pos.y);
-	}
+	// This demonstrates how to implement a helper function which will move the mouse if it finds a color on the screen
+	var didFind = yield moveMouseToColorInBoxWithTolerance({r: 255, g: 255, b: 255}, 0, 0, 1000, 1000, 10);
+	console.log(didFind ? 'We found the color and moved the mouse!' : 'We failed to find the color :(');
 
 	// This is a color picker. Every 100ms it returns your cursor position and the color of the pixel
 	while (true) {
@@ -48,4 +46,24 @@ $.spawn(function*(){
 	}
 
 });
+
+// This finds the color (with a tolerance of 10) in the box and moves the mouse to it immediately (if it's found)
+function moveMouseToColorInBoxWithTolerance(color, xs, ys, xe, ye, tolerance) {
+	// Unfortunately you must always use these two lines of boilerplate to ensure the yielding works correctly
+	return new Promise(function(resolve, reject) {
+		$.spawn(function*() {
+			// Now do whatever your function should do
+			var pos = yield $.findColorTolerance(color, xs, ys, xe, ye, tolerance);
+			var didFind = pos.x > -1 && pos.y > -1;
+			if (didFind) {
+				// We found something. Move the mouse there
+				yield $.setMouse(pos.x, pos.y);
+			}
+			// Instead of using `return result` we use `resolve(result)`
+			resolve(didFind);
+		});
+	});
+}
+
+// Call quit when you're done so we can free up the objects allocated for interacting with the Objective C layer
 $.quit();
