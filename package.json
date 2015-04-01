@@ -16,8 +16,12 @@
   },
   "dependencies": {
     "NodObjC": "~1.0.0",
-    "ffi": "git+https://github.com/kjunichi/node-ffi.git#bad796888ad564bbc6a15b73579223b8f118605e"
-
+    "ffi": "git+https://github.com/kjunichi/node-ffi.git#bad796888ad564bbc6a15b73579223b8f118605e",
+    "canvas": "~1.2.1",
+    "fs": "*"
+  },
+  "dependencies_comment": {
+    ".": "For help installing canvas, see: https://github.com/Automattic/node-canvas/wiki/Installation---OSX"
   },
   "license": "MIT"
 }

@@ -1,8 +1,40 @@
+/* 
+
+Welcome to macrojs. $ supports the following methods:
+
+    setMouse(x, y) moves the mouse to x, y immediately
+    moveMouseHuman(x, y, speed) moves the mouse to x, y like a human. Speed defaults to 25 if unspecified.
+    getMousePos() returns the current position in an object {x: x, y: y}
+    clickMouse(x, y, right) clicks the mouse like a human at x, y. Set right to true if it should right click.
+    mouseDown(x, y, right) presses the mouse down at x, y. Set right to true if it should right click.
+    mouseUp(x, y, right) releases the mouse down at x, y. Set right to true if it should right click.
+    sendKeysHuman(str) types the string str like a human. It only supports letters (upper and lowercase) and the space bar.
+    keyDown(char) presses the char.
+    keyUp(char) presses the char.
+    getColor(x, y) returns the color at x, y in an object {r: r, g: g, b: b} where r, g and b take values from 0 to 255.
+    findColor(target, xs, ys, xe, ye) returns the {x: x, y: y} coordinates of the target color in the box defined by xs, ys, xe, ye. The color must be provided as {r: r, g: g, b: b}
+    findColorTolerance(target, xs, ys, xe, ye, tolerance) does the same as findColor but allows you to specify a tolerance. Increasing the tolerance returns less perfect matches.
+    random(from, to) returns a random integer
+    wait(ms) waits for ms milliseconds
+
+    To call any of these you *must* use the yield keyword before the call. To learn why read http://www.html5rocks.com/en/tutorials/es6/promises/
+
+    If you implement a function which uses a call from $ you must include the boilerplate Promise and spawn function as in the moveMouseToColorInBoxWithTolerance example.
+    If you implement a function which doesn't call $ you may do it in the normal way.
+
+*/
+
+
 'use strict'
 
 var $ = require('NodObjC');
 $.framework('Cocoa');
 $.framework('Foundation');
+
+var Canvas = require('canvas');
+var Image = Canvas.Image;
+
+var fs = require('fs');
 
 var pool, cGEventSourceRef;
 
@@ -150,22 +182,29 @@ var findColor = function(target, xs, ys, xe, ye) {
     return findColorTolerance(target, xs, ys, xe, ye, 0);
 }
 
+var getScreenData = function(xs, ys, xe, ye) {
+    var displayID = getDisplayId();
+    var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
+    var width = $.CGImageGetWidth(cGImageRef);
+    var height = $.CGImageGetHeight(cGImageRef);
+    var data = new Buffer(height * width * 4);
+    var bytesPerPixel = 4;
+    var bytesPerRow = bytesPerPixel * width;
+    var bitsPerComponent = 8;
+    var cGColorSpaceRef = $.CGColorSpaceCreateDeviceRGB();
+    var cGContextRef = $.CGBitmapContextCreate(data, width, height, bitsPerComponent, bytesPerRow, cGColorSpaceRef, $.kCGImageAlphaPremultipliedLast | $.kCGBitmapByteOrder32Big);
+    $.CGContextDrawImage(cGContextRef, $.CGRectMake(0, 0, width, height), cGImageRef);
+    $.CGContextRelease(cGContextRef);
+    return data;
+}
+
 var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
     return new Promise(function(resolve, reject){
         var startTime = Date.now();
-        var displayID = getDisplayId();
-        var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
-        var width = $.CGImageGetWidth(cGImageRef);
-        var height = $.CGImageGetHeight(cGImageRef);
-        var data = new Buffer(height * width * 4);
-        var bytesPerPixel = 4;
-        var bytesPerRow = bytesPerPixel * width;
-        var bitsPerComponent = 8;
-        var cGColorSpaceRef = $.CGColorSpaceCreateDeviceRGB();
-        var cGContextRef = $.CGBitmapContextCreate(data, width, height, bitsPerComponent, bytesPerRow, cGColorSpaceRef, $.kCGImageAlphaPremultipliedLast | $.kCGBitmapByteOrder32Big);
-        $.CGContextDrawImage(cGContextRef, $.CGRectMake(0, 0, width, height), cGImageRef);
-        $.CGContextRelease(cGContextRef);
-        // console.log(data.toJSON());
+        var width = 2 * (xe - xs + 1);
+        var height = 2 * (ye - ys + 1);
+        var data = getScreenData(xs, ys, xe, ye);
+        var abs = Math.abs;
         for (var y = 0; y <= 2 * (ye - ys); y += 2) {
             for (var x = 0; x <= 2 * (xe - xs); x += 2) {
                 var r = data[4*(x + y * width)];
@@ -173,9 +212,16 @@ var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
                 var b = data[4*(x + y * width) + 2];
                 // console.log('red is at '+4*(x + y * width)+', green is at '+4*(x + y * width + 1)+', blue is at '+4*(x + y * width + 2));
                 // console.log('color at '+(xs + x/2)+', '+(ys + y/2) + ' is '+r+', '+g+', '+b);
-                if (Math.abs(r - target.r) + Math.abs(g - target.g) + Math.abs(b - target.b) <= tol) {
-                    // setMouse(xs + x/2, ys + y/2);
-                    resolve({x: xs + x/2, y: ys + y/2});
+                var error = abs(r - target.r);
+                if (error <= tol) {
+                    error += abs(g - target.g);
+                    if (error <= tol) {
+                        error += abs(b - target.b);
+                        if (error <= tol) {
+                            // setMouse(xs + x/2, ys + y/2);
+                            resolve({x: xs + x/2, y: ys + y/2});
+                        }
+                    }
                 }
             }
         }
@@ -183,6 +229,64 @@ var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
         var timeDelta = endTime-startTime;
         // console.log('Done. Took '+timeDelta+'ms, or '+(timeDelta/((xe-xs)*(ye-ys)))+'ms per pixel.');
         resolve({x: -1, y: -1});
+    });
+}
+
+var findBitmap = function(imageName, xs, ys, xe, ye, tolerance) {
+    return new Promise(function(resolve, reject){
+        var imageSrc = fs.readFileSync(__dirname + '/' + imageName);
+        var image = new Image;
+        var abs = Math.abs;
+        image.onload = function () {
+            var canvas = new Canvas(image.width, image.height);
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0, image.width, image.height);
+            var imageData = ctx.getImageData(0, 0, image.width, image.height).data;
+            var imageWidth = image.width;
+            var imageHeight = image.height;
+            var screenData = getScreenData(xs, ys, xe, ye);
+            var screenWidth = 2 * (xe - xs + 1);
+            var screenHeight = 2 * (ye - ys + 1);
+            // Increment by 1 instead of 2 incase the bitmap is offset
+            for (var screenStartY = 0; screenStartY <= 2 * (ye - ys - imageHeight); screenStartY++) {
+                for (var screenStartX = 0; screenStartX <= 2 * (xe - xs - imageWidth); screenStartX++) {
+                    var match = true;
+                    var foundX = screenStartX;
+                    var foundY = screenStartY;
+                    for (var imageY = 0; imageY < imageHeight; imageY++) {
+                        var screenY = screenStartY + imageY;
+                            for (var imageX = 0; imageX < imageWidth; imageX++) {
+                            var screenX = screenStartX + imageX;
+                            // console.log('Comparing '+imageX+', '+imageY+' to '+screenX +', '+screenY);
+                            var screenR = screenData[4*(screenX + screenY * screenWidth)];
+                            var screenG = screenData[4*(screenX + screenY * screenWidth) + 1];
+                            var screenB = screenData[4*(screenX + screenY * screenWidth) + 2];
+                            var imageR = imageData[4*(imageX + imageY * imageWidth)];
+                            var imageG = imageData[4*(imageX + imageY * imageWidth) + 1];
+                            var imageB = imageData[4*(imageX + imageY * imageWidth) + 2];
+                            // console.log({r: imageR, g: imageG, b: imageB});
+                            var error = abs(screenR - imageR) + abs(screenG - imageG) + abs(screenB - imageB);
+                            // console.log(abs(screenR - imageR) + abs(screenG - imageG) + abs(screenB - imageB));
+                            if (error > tolerance) {
+                                match = false;
+                                break;
+                            } else {
+                                // console.log('Partial match');
+                            }
+                        }
+                        if (!match) {
+                            break;
+                        }
+                    }
+                    if (match) {
+                        resolve({x: foundX/2 << 0, y: foundY/2 << 0});
+                        return;
+                    }
+                }
+            }
+            resolve({x: -1, y: -1});    
+        }
+        image.src = imageSrc;
     });
 }
 
@@ -405,6 +509,7 @@ module.exports = {
     getRealColor: getRealColor,
     findColor: findColor,
     findColorTolerance: findColorTolerance,
+    findBitmap: findBitmap,
     random: random,
     wait: wait,
     spawn: spawn,

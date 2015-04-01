@@ -14,8 +14,12 @@ Welcome to macrojs. $ supports the following methods:
     getColor(x, y) returns the color at x, y in an object {r: r, g: g, b: b} where r, g and b take values from 0 to 255.
     findColor(target, xs, ys, xe, ye) returns the {x: x, y: y} coordinates of the target color in the box defined by xs, ys, xe, ye. The color must be provided as {r: r, g: g, b: b}
     findColorTolerance(target, xs, ys, xe, ye, tolerance) does the same as findColor but allows you to specify a tolerance. Increasing the tolerance returns less perfect matches.
+    findBitmap(imageName, xs, ys, xe, ye, tolerance) returns the {x: x, y: y} coordinates of the bitmap in the box defined by xs, ys, xe, ye.
     random(from, to) returns a random integer
     wait(ms) waits for ms milliseconds
+
+    To find a bitmap you must pass it in as a data URI. These can be generated for any image using the datauir plugin: https://github.com/heldr/datauri.
+    I recommend you only use very small images. First save them as bitmaps then convert them into datauris using `datauri your_image.bmp`
 
 	To call any of these you *must* use the yield keyword before the call. To learn why read http://www.html5rocks.com/en/tutorials/es6/promises/
 
@@ -28,7 +32,7 @@ var $ = require('./macro.js');
 
 $.spawn(function*(){
 
-	// This moves the mouse to (100, 100), clicks, then types "Hello world".
+	// EXAMPLE 1: This moves the mouse to (100, 100), clicks, then types "Hello world".
 	yield $.moveMouseHuman(100, 100, 30);
 	yield $.wait(100);
 	yield $.clickMouse(100, 100);
@@ -36,11 +40,17 @@ $.spawn(function*(){
 	yield $.sendKeysHuman('Hello world');
 	yield $.wait(1000 + $.random(0, 1000));
 
-	// This demonstrates how to implement a helper function which will move the mouse if it finds a color on the screen
-	var didFind = yield moveMouseToColorInBoxWithTolerance({r: 255, g: 255, b: 255}, 0, 0, 1000, 1000, 10);
+	// EXAMPLE 2: This demonstrates how to implement a helper function which will move the mouse if it finds a color on the screen
+	var didFind = yield moveMouseToColorInBoxWithTolerance({r: 255, g: 255, b: 255}, 0, 0, 1, 1, 10);
 	console.log(didFind ? 'We found the color and moved the mouse!' : 'We failed to find the color :(');
 
-	// This is a color picker. Every 100ms it returns your cursor position and the color of the pixel
+	// EXAMPLE 3: This demonstrates how to find a bitmap on the screen and move the mouse to it's position
+	var pos = yield $.findBitmap('image.png', 0, 0, 1000, 1000, 10);
+	if (pos.x > 0 && pos.y > 0) {
+		yield $.setMouse(pos.x, pos.y);
+	}
+
+	// EXAMPLE 4: This is a color picker. Every 100ms it returns your cursor position and the color of the pixel
 	while (true) {
 		yield $.wait(100);
 		var pos = yield $.getMousePos();
