@@ -182,7 +182,7 @@ var findColor = function(target, xs, ys, xe, ye) {
     return findColorTolerance(target, xs, ys, xe, ye, 0);
 }
 
-var getScreenData = function(xs, ys, xe, ye) {
+var getScreenDataAndMeta = function(xs, ys, xe, ye) {
     var displayID = getDisplayId();
     var cGImageRef = $.CGDisplayCreateImageForRect(displayID, $.CGRectMake(xs, ys, xe - xs + 1, ye - ys + 1));
     var width = $.CGImageGetWidth(cGImageRef);
@@ -195,15 +195,16 @@ var getScreenData = function(xs, ys, xe, ye) {
     var cGContextRef = $.CGBitmapContextCreate(data, width, height, bitsPerComponent, bytesPerRow, cGColorSpaceRef, $.kCGImageAlphaPremultipliedLast | $.kCGBitmapByteOrder32Big);
     $.CGContextDrawImage(cGContextRef, $.CGRectMake(0, 0, width, height), cGImageRef);
     $.CGContextRelease(cGContextRef);
-    return data;
+    return {data: data, width: width, height: height};
 }
 
 var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
     return new Promise(function(resolve, reject){
         var startTime = Date.now();
-        var width = 2 * (xe - xs + 1);
-        var height = 2 * (ye - ys + 1);
-        var data = getScreenData(xs, ys, xe, ye);
+        var dataAndMeta = getScreenDataAndMeta(xs, ys, xe, ye);
+        var data = dataAndMeta.data;
+        var width = dataAndMeta.width;
+        var height = dataAndMeta.height;
         var abs = Math.abs;
         for (var y = 0; y <= 2 * (ye - ys); y += 2) {
             for (var x = 0; x <= 2 * (xe - xs); x += 2) {
@@ -244,15 +245,16 @@ var findBitmap = function(imageName, xs, ys, xe, ye, tolerance) {
             var imageData = ctx.getImageData(0, 0, image.width, image.height).data;
             var imageWidth = image.width;
             var imageHeight = image.height;
-            var screenData = getScreenData(xs, ys, xe, ye);
-            var screenWidth = 2 * (xe - xs + 1);
-            var screenHeight = 2 * (ye - ys + 1);
+            var screenDataAndMeta = getScreenDataAndMeta(xs, ys, xe, ye);
+            var screenData = screenDataAndMeta.data;
+            var screenWidth = screenDataAndMeta.width;
+            var screenHeight = screenDataAndMeta.height;
             // Increment by 1 instead of 2 incase the bitmap is offset
-            for (var screenStartY = 0; screenStartY <= 2 * (ye - ys - imageHeight); screenStartY++) {
-                for (var screenStartX = 0; screenStartX <= 2 * (xe - xs - imageWidth); screenStartX++) {
+            for (var screenStartY = 0; screenStartY <= 2 * (screenHeight - imageHeight); screenStartY++) {
+                for (var screenStartX = 0; screenStartX <= 2 * (screenWidth - imageWidth); screenStartX++) {
                     var match = true;
-                    var foundX = screenStartX;
-                    var foundY = screenStartY;
+                    var foundX = 2 * xs + screenStartX;
+                    var foundY = 2 * ys + screenStartY;
                     for (var imageY = 0; imageY < imageHeight; imageY++) {
                         var screenY = screenStartY + imageY;
                             for (var imageX = 0; imageX < imageWidth; imageX++) {
@@ -279,6 +281,7 @@ var findBitmap = function(imageName, xs, ys, xe, ye, tolerance) {
                         }
                     }
                     if (match) {
+                        // console.log('matched');
                         resolve({x: foundX/2 << 0, y: foundY/2 << 0});
                         return;
                     }
