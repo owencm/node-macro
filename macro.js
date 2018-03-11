@@ -1,4 +1,4 @@
-/* 
+/*
 
 Welcome to macrojs. $ supports the following methods:
 
@@ -27,9 +27,10 @@ Welcome to macrojs. $ supports the following methods:
 
 'use strict'
 
-var $ = require('NodObjC');
+var $ = require('nodobjc');
 $.framework('Cocoa');
 $.framework('Foundation');
+$.framework('CoreGraphics')
 
 var Canvas = require('canvas');
 var Image = Canvas.Image;
@@ -61,7 +62,7 @@ function spawn(generatorFunc) {
 
 var getMousePos = function() {
     return new Promise(function(resolve, reject){
-        var ourEvent = $.CGEventCreate(cGEventSourceRef); 
+        var ourEvent = $.CGEventCreate(cGEventSourceRef);
         var pos = $.CGEventGetLocation(ourEvent);
         resolve({x: pos.x << 0, y: pos.y << 0});
     });
@@ -169,7 +170,7 @@ var getBitmap = function(xs, ys, xe, ye) {
 var getRealColor = function(x, y) {
     return new Promise(function(resolve, reject){
         var nSBitmapImageRep = getBitmap(x, y, x, y);
-        var nSColor = nSBitmapImageRep('colorAtX', 0, 'y', 0);  
+        var nSColor = nSBitmapImageRep('colorAtX', 0, 'y', 0);
         nSBitmapImageRep('release');
         var red = nSColor('redComponent') * 255;
         var green = nSColor('greenComponent') * 255;
@@ -178,8 +179,8 @@ var getRealColor = function(x, y) {
     });
 }
 
-var findColor = function(target, xs, ys, xe, ye) {
-    return findColorTolerance(target, xs, ys, xe, ye, 0);
+var findColor = function(target, {xs, ys, xe, ye}) {
+    return findColorTolerance(target, {xs, ys, xe, ye}, 0);
 }
 
 var getScreenDataAndMeta = function(xs, ys, xe, ye) {
@@ -198,42 +199,59 @@ var getScreenDataAndMeta = function(xs, ys, xe, ye) {
     return {data: data, width: width, height: height};
 }
 
-var findColorTolerance = function(target, xs, ys, xe, ye, tol) {
-    return new Promise(function(resolve, reject){
-        var startTime = Date.now();
-        var dataAndMeta = getScreenDataAndMeta(xs, ys, xe, ye);
-        var data = dataAndMeta.data;
-        var width = dataAndMeta.width;
-        var height = dataAndMeta.height;
-        var abs = Math.abs;
-        for (var y = 0; y <= 2 * (ye - ys); y += 2) {
-            for (var x = 0; x <= 2 * (xe - xs); x += 2) {
-                var r = data[4*(x + y * width)];
-                var g = data[4*(x + y * width) + 1];
-                var b = data[4*(x + y * width) + 2];
-                // console.log('red is at '+4*(x + y * width)+', green is at '+4*(x + y * width + 1)+', blue is at '+4*(x + y * width + 2));
-                // console.log('color at '+(xs + x/2)+', '+(ys + y/2) + ' is '+r+', '+g+', '+b);
-                var error = abs(r - target.r);
-                if (error <= tol) {
-                    error += abs(g - target.g);
-                    if (error <= tol) {
-                        error += abs(b - target.b);
-                        if (error <= tol) {
-                            // setMouse(xs + x/2, ys + y/2);
-                            resolve({x: xs + x/2, y: ys + y/2});
-                        }
-                    }
-                }
-            }
-        }
-        var endTime = Date.now();
-        var timeDelta = endTime-startTime;
-        // console.log('Done. Took '+timeDelta+'ms, or '+(timeDelta/((xe-xs)*(ye-ys)))+'ms per pixel.');
-        resolve({x: -1, y: -1});
-    });
+var getSpiralCoords = function(xs, ys, xe, ye) {
+  xm = Math.round((xs + xe) / 2)
+  ym = Math.round((ys + ye) / 2)
+
 }
 
-var findBitmap = function(imageName, xs, ys, xe, ye, tolerance) {
+var gatherColorTolerance = function(target, {xs, ys, xe, ye}, tol, limit = 100000) {
+  return new Promise(function(resolve, reject){
+      var startTime = Date.now();
+      var dataAndMeta = getScreenDataAndMeta(xs, ys, xe, ye);
+      var data = dataAndMeta.data;
+      var width = dataAndMeta.width;
+      var height = dataAndMeta.height;
+      var abs = Math.abs;
+      let points = []
+      for (var y = 0; y <= 2 * (ye - ys); y += 2) {
+          for (var x = 0; x <= 2 * (xe - xs); x += 2) {
+              var r = data[4*(x + y * width)];
+              var error = abs(r - target.r);
+              if (error <= tol) {
+                  var g = data[4*(x + y * width) + 1];
+                  error += abs(g - target.g);
+                  if (error <= tol) {
+                      var b = data[4*(x + y * width) + 2];
+                      error += abs(b - target.b);
+                      if (error <= tol) {
+                          points.push({x: xs + x/2, y: ys + y/2});
+                          if (points.length > limit) {
+                            break;
+                          }
+                      }
+                  }
+              }
+          }
+      }
+      var endTime = Date.now();
+      var timeDelta = endTime-startTime;
+      // console.log('Done. Took '+timeDelta+'ms, or '+(timeDelta/((xe-xs)*(ye-ys)))+'ms per pixel.');
+      resolve(points)
+  });
+}
+
+var findColorTolerance = function(target, {xs, ys, xe, ye}, tol) {
+  return gatherColorTolerance(target, {xs, ys, xe, ye}, tol, 1).then((points) => {
+    if (points.length > 0) {
+      return points[0]
+    } else {
+      return { x: -1, y: -1 }
+    }
+  })
+}
+
+var findBitmap = function(imageName, {xs, ys, xe, ye}, tolerance) {
     return new Promise(function(resolve, reject){
         var imageSrc = fs.readFileSync(__dirname + '/' + imageName);
         var image = new Image;
@@ -243,21 +261,24 @@ var findBitmap = function(imageName, xs, ys, xe, ye, tolerance) {
             var ctx = canvas.getContext('2d');
             ctx.drawImage(image, 0, 0, image.width, image.height);
             var imageData = ctx.getImageData(0, 0, image.width, image.height).data;
+            // console.log(imageData)
             var imageWidth = image.width;
             var imageHeight = image.height;
             var screenDataAndMeta = getScreenDataAndMeta(xs, ys, xe, ye);
+            console.log(screenDataAndMeta)
             var screenData = screenDataAndMeta.data;
             var screenWidth = screenDataAndMeta.width;
             var screenHeight = screenDataAndMeta.height;
             // Increment by 1 instead of 2 incase the bitmap is offset
             for (var screenStartY = 0; screenStartY <= 2 * (screenHeight - imageHeight); screenStartY++) {
                 for (var screenStartX = 0; screenStartX <= 2 * (screenWidth - imageWidth); screenStartX++) {
+                    // console.log('looking for match at', screenStartX, screenStartY)
                     var match = true;
                     var foundX = 2 * xs + screenStartX;
                     var foundY = 2 * ys + screenStartY;
                     for (var imageY = 0; imageY < imageHeight; imageY++) {
                         var screenY = screenStartY + imageY;
-                            for (var imageX = 0; imageX < imageWidth; imageX++) {
+                        for (var imageX = 0; imageX < imageWidth; imageX++) {
                             var screenX = screenStartX + imageX;
                             // console.log('Comparing '+imageX+', '+imageY+' to '+screenX +', '+screenY);
                             var screenR = screenData[4*(screenX + screenY * screenWidth)];
@@ -281,13 +302,13 @@ var findBitmap = function(imageName, xs, ys, xe, ye, tolerance) {
                         }
                     }
                     if (match) {
-                        // console.log('matched');
+                        console.log('matched');
                         resolve({x: foundX/2 << 0, y: foundY/2 << 0});
                         return;
                     }
                 }
             }
-            resolve({x: -1, y: -1});    
+            resolve({x: -1, y: -1});
         }
         image.src = imageSrc;
     });
@@ -348,7 +369,7 @@ var moveMouse = function (endX, endY, speed) {
                     resolve();
                     break;
                 } else {
-                    xCounter += speedModifier; 
+                    xCounter += speedModifier;
                     yCounter += speedModifier;
                     if (xCounter >= moveEveryX) {
                         xCounter -= moveEveryX;
@@ -367,7 +388,7 @@ var moveMouse = function (endX, endY, speed) {
 }
 
 // A port of humanWindMouse from https://github.com/SRL/SRL-6/
-var moveMouseHuman = function(xe, ye, speed) {
+var moveMouseHuman = function(xe, ye, accuracy=10, speed=40) {
     return new Promise(function(resolve, reject){
         spawn(function*() {
             var distance = function(start, end) {
@@ -375,8 +396,8 @@ var moveMouseHuman = function(xe, ye, speed) {
             }
             var pos = yield getMousePos();
 
-            var xs = pos.x;
-            var ys = pos.y;
+            var xs = pos.x + random(0, accuracy);
+            var ys = pos.y + random(0, accuracy);
             var targetArea = ((Math.random() * speed) / 2.0 + speed);
             var gravity = 7;
             var wind = 5;
@@ -467,23 +488,41 @@ var sendKeysHuman = function (str) {
             for(var i = 0; i < str.length; i++) {
                 var key = str[i];
                 var uppercase = key !== key.toLowerCase();
-                if (uppercase) { 
+                if (uppercase) {
                     key = key.toLowerCase();
-                    yield keyDown('shift'); 
-                    yield wait(random(20,70)); 
+                    yield keyDown('shift');
+                    yield wait(random(20,70));
                 };
                 yield keyDown(key);
                 yield wait(random(30, 125));
                 yield keyUp(key);
                 yield wait(random(10, 100));
-                if (uppercase) { 
-                    yield keyUp('shift'); 
-                    yield wait(random(10, 50)); 
+                if (uppercase) {
+                    yield keyUp('shift');
+                    yield wait(random(10, 50));
                 };
             }
             resolve();
         });
     });
+}
+
+// This finds the color (with a tolerance of 10) in the box and moves the mouse to it immediately (if it's found)
+var moveMouseToColorInBoxWithTolerance = function(color, xs, ys, xe, ye, tolerance) {
+	// Unfortunately you must always use these two lines of boilerplate to ensure the yielding works correctly
+	return new Promise(function(resolve, reject) {
+		$.spawn(function*() {
+			// Now do whatever your function should do
+			var pos = yield $.findColorTolerance(color, xs, ys, xe, ye, tolerance);
+			var didFind = pos.x > -1 && pos.y > -1;
+			if (didFind) {
+				// We found something. Move the mouse there
+				yield $.setMouse(pos.x, pos.y);
+			}
+			// Instead of using `return result` we use `resolve(result)`
+			resolve(didFind);
+		});
+	});
 }
 
 var init = function() {
@@ -495,26 +534,79 @@ var quit = function() {
     pool('drain');
 }
 
+const distance = (pointA, pointB) => {
+  return Math.sqrt(Math.pow(pointA.x - pointB.x, 2), Math.pow(pointA.y - pointB.y, 2))
+}
+
+const clusterClosest = (clusters, point) => {
+  if (clusters.length < 1) {
+    throw 'No clusters provided'
+  }
+  let closestCluster
+  let minDistance
+  for (let cluster of clusters) {
+    let clDistance = distance(cluster[0], point)
+    if (clDistance < minDistance || minDistance == undefined) {
+      minDistance = clDistance
+      closestCluster = cluster
+    }
+  }
+  return closestCluster
+}
+
+const cluster = (points, range) => {
+  let clusters = []
+  for (let point of points) {
+    let clustered = false
+    for (let cluster of clusters) {
+      if (distance(cluster[0], point) <= range) {
+        cluster.push(point)
+        clustered = true
+        break
+      }
+    }
+    if (!clustered) {
+      clusters.push([point])
+    }
+  }
+  return clusters;
+}
+
+const clusterCenter = (points) => {
+  let x = 0
+  let y = 0
+  for (let point of points) {
+    x += point.x
+    y += point.y
+  }
+  return { x: Math.round(x/points.length), y: Math.round(y/points.length) }
+}
+
 init();
 
 module.exports = {
-    init: init,
-    moveMouseHuman: moveMouseHuman,
-    getMousePos: getMousePos,
-    setMouse: setMouse,
-    clickMouse: clickMouse,
-    mouseDown: mouseDown,
-    mouseUp: mouseUp,
-    sendKeysHuman: sendKeysHuman,
-    keyDown: keyDown,
-    keyUp: keyUp,
-    getColor: getColor,
-    getRealColor: getRealColor,
-    findColor: findColor,
-    findColorTolerance: findColorTolerance,
-    findBitmap: findBitmap,
-    random: random,
-    wait: wait,
-    spawn: spawn,
-    quit: quit
+    init,
+    moveMouseHuman,
+    getMousePos,
+    setMouse,
+    clickMouse,
+    cluster,
+    clusterClosest,
+    clusterCenter,
+    mouseDown,
+    mouseUp,
+    moveMouseToColorInBoxWithTolerance,
+    sendKeysHuman,
+    keyDown,
+    keyUp,
+    getColor,
+    getRealColor,
+    gatherColorTolerance,
+    findColor,
+    findColorTolerance,
+    findBitmap,
+    random,
+    wait,
+    spawn,
+    quit
 }
